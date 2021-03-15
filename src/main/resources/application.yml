@@ -1,0 +1,17 @@
+server:
+  port: 9100
+spring:
+  rabbitmq:
+    addresses: 192.168.22.80
+    username: sunyw
+    password: 1234
+    listener:
+      simple:
+        #设置为手动ack
+        acknowledge-mode: manual
+    #开启交换器收到消息后回调
+    publisher-confirms: true
+    #开启queue收到消息后回调
+    publisher-returns: true
+    template:
+      mandatory: true
