@@ -21,4 +21,5 @@ public class ProducerConfig {
         return new Queue("testue");
     }
 
+
 }

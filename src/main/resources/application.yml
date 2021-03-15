@@ -7,6 +7,10 @@ spring:
     password: 1234
     listener:
       simple:
+        retry:
+          enabled: true
+          max-attempts: 5
+          initial-interval: 3000
         #设置为手动ack
         acknowledge-mode: manual
     #开启交换器收到消息后回调

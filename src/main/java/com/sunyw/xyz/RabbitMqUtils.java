@@ -2,6 +2,7 @@ package com.sunyw.xyz;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sunyw.xyz.sec.RabbitTask;
 import com.sunyw.xyz.vo.SendData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,24 +36,8 @@ public class RabbitMqUtils {
 
     public void send(SendData obj) {
         logger.info("开始通过消息队列进行消息发送,发送信息为:{}", obj.toString());
-        try {
-            Message build = MessageBuilder.withBody(objectMapper.writeValueAsBytes(obj.getReqData())).setDeliveryMode(MessageDeliveryMode.PERSISTENT).build();
-            rabbitTemplate.setConfirmCallback(confirmCallback);
-            CorrelationData correlationData = new CorrelationData(obj.getSendId());
-            rabbitTemplate.convertAndSend(obj.getRoutingKey(), obj.getRouteExchange(), build, correlationData);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        RabbitTask.rabbitList.add(obj);
     }
 
-    private final RabbitTemplate.ConfirmCallback confirmCallback = (correlationData, ack, s) -> {
-        logger.info("回调函数开始执行,返回id为:{}", correlationData.getId());
-        logger.info("当前消息是否已被ACK?{}", ack);
-        if (ack) {
-           logger.info("消息已被确认");
-        } else {
-           logger.info("");
-        }
-    };
 
 }

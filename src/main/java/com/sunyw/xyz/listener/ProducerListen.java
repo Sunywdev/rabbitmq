@@ -2,14 +2,18 @@ package com.sunyw.xyz.listener;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
+import com.sunyw.xyz.sec.RabbitTask;
 import com.sunyw.xyz.vo.Mail;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import sun.nio.cs.ext.MS874;
+import sun.rmi.runtime.Log;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 名称: XX定义
@@ -23,6 +27,8 @@ import java.io.IOException;
 @Component
 
 public class ProducerListen {
+
+
     @Autowired
     private ObjectMapper objectMapper;
 
@@ -46,7 +52,17 @@ public class ProducerListen {
     }
 
     @RabbitListener(bindings = @QueueBinding(
-            value = @Queue(value = "test2", durable = "true"),
+            value = @Queue(value = "test2", durable = "true", arguments = {
+                    //绑定死信队列的交换机名称
+                    @Argument(name = "x-dead-letter-exchange", value = "deadExchange"),
+                    //死信队列的key
+                    @Argument(name = "x-dead-letter-routing-key", value = "deadKey"),
+                    //最大存活时间单位:ms,超过这个时间就会从当前队列中移除,也就是放到死信队列中去
+                    @Argument(name = "x-message-ttl", value = "1000", type = "java.lang.Integer")
+                    //最大长度 超过长度后移除, 注意:rabbitmq修改交换器类型或者修改队列的时间,都会导致服务启动失败,解决方法:要不重新新建一个
+                    // ,要不访问web控制台将之前旧的移除掉
+                    //@Argument(name = "x-max-length",value = "5",type = "java.lang.Integer")
+            }),
             exchange = @Exchange(name = "test2", type = "topic"),
             key = "test2.*")
     )
@@ -55,19 +71,43 @@ public class ProducerListen {
         System.out.println("消费者接受到消息");
         long deliveryTag = message.getMessageProperties().getDeliveryTag();
         System.out.println(deliveryTag);
+        Mail mail = null;
         try {
             byte[] body = message.getBody();
-            Mail mail = objectMapper.readValue(body, Mail.class);
+            mail = objectMapper.readValue(body, Mail.class);
+            int a = 1 / 0;
             System.out.println("test2接收到的信息为:" + mail.toString());
             channel.basicAck(deliveryTag, true);
         } catch (Exception e) {
-            e.printStackTrace();
-            try {
-                channel.basicNack(deliveryTag, true, true);
-            } catch (IOException e1) {
-                e1.printStackTrace();
-            }
-
+            RabbitTask.deadListAdd(mail);
         }
     }
+
+    /**
+     * 死信队列处理
+     *
+     * @param channel
+     * @param message
+     */
+    @RabbitListener(bindings = @QueueBinding(
+            value = @Queue(value = "deadQueue"),
+            exchange = @Exchange(name = "deadExchange", type = "topic"),
+            key = "deadKey"))
+    public void test2Dead(Channel channel, Message message) {
+
+        long deliveryTag = message.getMessageProperties().getDeliveryTag();
+        Mail mail = null;
+        try {
+            byte[] body = message.getBody();
+            mail = objectMapper.readValue(body, Mail.class);
+            System.out.println("test2接收到的信息为:" + mail.toString());
+            System.out.println("死信队列接收到消息");
+            System.out.println(deliveryTag);
+            channel.basicAck(deliveryTag, true);
+        } catch (Exception e) {
+            System.out.println("开始进入数组,等待唤醒");
+            RabbitTask.deadListAdd(mail);
+        }
+    }
+
 }
